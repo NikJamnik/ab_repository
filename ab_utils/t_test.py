@@ -111,3 +111,118 @@ def onesample_p_value(
     t_stat, p = st.ttest_1samp(x, popmean = mu0, alternative = alternative)
     return p, t_stat, df
 
+
+def welch_t_stat(x: np.ndarray, y: np.ndarray) -> tuple[float, float, float]:
+    """
+    Вычисляет t-статистику для двухвыборочного Welch's t-теста.
+
+    Этот тест используется для сравнения средних двух групп, 
+    когда их дисперсии могут отличаться (в отличие от классического t-теста с равными дисперсиями).
+
+    Args:
+        x (np.ndarray): Набор наблюдений первой выборки.
+        y (np.ndarray): Набор наблюдений второй выборки.
+
+    Returns:
+        tuple[float, float, float]:
+            - t_stat (float): значение t-статистики;
+            - df (float): число степеней свободы, вычисленное по формуле Уэлча-Саттеруэйта;
+            - se (float): стандартная ошибка разности средних.
+    """
+    # Преобразуем входные данные в массивы NumPy
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    # Размеры выборок
+    nx, ny = len(x), len(y)
+
+    # Средние значения по выборкам
+    mx, my = x.mean(), y.mean()
+
+    # Выборочные дисперсии (несмещённые, ddof=1)
+    vx, vy = x.var(ddof = 1), y.var(ddof = 1)
+
+    # Стандартная ошибка разности средних
+    se: float = np.sqrt(vx / nx + vy / ny)
+
+    # Статистика t по формуле Welch
+    t_stat: float = (mx - my) / se
+
+    # Расчёт степеней свободы по формуле Уэлча-Саттеруэйта
+    df_num = (vx / nx + vy / ny) ** 2
+    df_den = (vx**2 / (nx**2 * (nx - 1))) + (vy**2 / (ny**2 * (ny - 1)))
+    df: float = df_num / df_den
+
+    return t_stat, df, se
+
+
+def welch_p_value_manual(
+    x: np.ndarray, y: np.ndarray, alternative: str = 'two-sided'
+) -> tuple[float, float, float]:
+    """
+    Вычисляет p-value для двухвыборочного Welch's t-теста.
+
+    Проверяет нулевую гипотезу H₀: μ₁ = μ₂ против одной из альтернатив:
+        - 'two-sided' (по умолчанию): μ₁ ≠ μ₂
+        - 'greater': μ₁ > μ₂
+        - 'less': μ₁ < μ₂
+
+    Args:
+        x (np.ndarray): Набор наблюдений первой выборки.
+        y (np.ndarray): Набор наблюдений второй выборки.
+        alternative (str, optional): Направление альтернативной гипотезы. 
+            Возможные значения: 'two-sided', 'greater', 'less'. 
+            По умолчанию 'two-sided'.
+
+    Returns:
+        tuple[float, float, float]:
+            - p (float): p-value критерия;
+            - t_stat (float): рассчитанная t-статистика;
+            - df (float): число степеней свободы.
+    """
+    t_stat, df, _ = welch_t_stat(x, y)
+
+    # Расчёт p-value в зависимости от направления теста
+    if alternative == 'two-sided':
+        p: float = 2 * (1 - st.t.cdf(abs(t_stat), df))
+    elif alternative == 'greater':
+        p = 1 - st.t.cdf(t_stat, df)
+    else:  # 'less'
+        p = st.t.cdf(t_stat, df)
+
+    return p, t_stat, df
+
+
+def welch_p_value(
+    x: np.ndarray, y: np.ndarray, alternative: str = 'two-sided'
+) -> tuple[float, float, float]:
+    """
+    Вычисляет p-value для двухвыборочного Welch's t-теста.
+
+    Проверяет нулевую гипотезу H₀: μ₁ = μ₂ против одной из альтернатив:
+        - 'two-sided' (по умолчанию): μ₁ ≠ μ₂
+        - 'greater': μ₁ > μ₂
+        - 'less': μ₁ < μ₂
+
+    Args:
+        x (np.ndarray): Набор наблюдений первой выборки.
+        y (np.ndarray): Набор наблюдений второй выборки.
+        alternative (str, optional): Направление альтернативной гипотезы. 
+            Возможные значения: 'two-sided', 'greater', 'less'. 
+            По умолчанию 'two-sided'.
+
+    Returns:
+        tuple[float, float, float]:
+            - p (float): p-value критерия;
+            - t_stat (float): рассчитанная t-статистика;
+            - df (float): число степеней свободы.
+    """
+    t_stat, p, df = st.ttest_ind(
+        a = x,
+        b = y,
+        alternative = alternative,
+        equal_var = False
+    )
+
+    return p, t_stat, df
+
